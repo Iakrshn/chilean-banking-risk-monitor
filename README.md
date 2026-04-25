@@ -107,7 +107,7 @@ requests descarga Excel por mes                │
 
 ```bash
 # 1. Clonar el repositorio
-git clone https://github.com/tu-usuario/chilean-banking-risk-monitor.git
+git clone https://github.com/Iakrshn/chilean-banking-risk-monitor.git
 cd chilean-banking-risk-monitor
 
 # 2. Instalar dependencias
@@ -152,6 +152,6 @@ El análisis utiliza definiciones y métricas alineadas con el marco regulatorio
 
 ## Autor
 
-**[Krishna Bustos Santibáñez]**  
+**Krishna Bustos Santibáñez**  
 Analista de Datos | Finanzas & Control de Gestión 
 [LinkedIn](https://linkedin.com/in/krishnabustoss) · [GitHub](https://github.com/Iakrshn)
