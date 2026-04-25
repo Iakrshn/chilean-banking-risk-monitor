@@ -1,0 +1,7 @@
+# Ignorar datos crudos y procesados
+data/
+*.xlsx
+*.csv
+
+# Ignorar credenciales
+.env
