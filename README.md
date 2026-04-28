@@ -11,6 +11,17 @@
 
 ---
 
+## 📊 Dashboards Interactivos
+
+> Haz clic para explorar los resultados en vivo — sin descargar nada.
+
+| Dashboard | Descripción |
+|-----------|-------------|
+| [📈 Dashboard Principal](https://Iakrshn.github.io/chilean-banking-risk-monitor/reports/dashboard_interactivo.html) | Evolución histórica, TPM, morosidad por cartera, IMACEC, ranking y scatter por ciclo |
+| [🚦 Semáforo de Riesgo](https://Iakrshn.github.io/chilean-banking-risk-monitor/reports/semaforo_riesgo.html) | Clasificación ALTO / MEDIO / BAJO por institución bancaria retail (Feb 2026) |
+
+---
+
 ## Pregunta Central
 
 **¿Cómo impacta el ciclo monetario chileno en el riesgo de crédito del sistema bancario, y qué instituciones son más vulnerables a shocks macroeconómicos?**
@@ -180,3 +191,4 @@ El análisis utiliza definiciones y métricas alineadas con el marco regulatorio
 **Krishna Bustos Santibáñez**  
 Analista de Datos | Finanzas & Control de Gestión  
 [LinkedIn](https://linkedin.com/in/krishnabustoss) · [GitHub](https://github.com/Iakrshn)
+
