@@ -123,7 +123,7 @@ requests descarga Excel por mes                │
                         ▼
              Dataset Maestro Integrado
              2,172 obs | 25 bancos | 122 meses
-             18 variables | Ene 2016 – Feb 2026
+             18 variables | Ene 2016 – Abr 2026
                         │
          ┌──────────────┼──────────────────────┐
          ▼              ▼                       ▼
@@ -160,6 +160,22 @@ python src/descargar_cmf.py
 jupyter notebook notebooks/
 ```
 
+## Cómo Probar
+
+```bash
+# Ejecutar la suite de pruebas unitarias
+python3 -m pytest -q
+```
+
+## Pipeline Automatizada
+
+```bash
+# Ejecutar la pipeline completa sin abrir manualmente los notebooks
+PYTHONPATH=$PWD python3 -m nbconvert --to notebook --execute notebooks/01_pipeline_datos.ipynb --output 01_pipeline_datos.executed.ipynb --output-dir notebooks --ExecutePreprocessor.timeout=1200
+PYTHONPATH=$PWD python3 -m nbconvert --to notebook --execute notebooks/02_analisis_estadistico.ipynb --output 02_analisis_estadistico.executed.ipynb --output-dir notebooks --ExecutePreprocessor.timeout=1200
+PYTHONPATH=$PWD python3 -m nbconvert --to notebook --execute notebooks/03_dashboard_riesgo.ipynb --output 03_dashboard_riesgo.executed.ipynb --output-dir notebooks --ExecutePreprocessor.timeout=1200
+```
+
 ---
 
 ## Herramientas
@@ -189,6 +205,6 @@ El análisis utiliza definiciones y métricas alineadas con el marco regulatorio
 ## Autor
 
 **Krishna Bustos Santibáñez**  
-Analista de Datos | Finanzas & Control de Gestión  
+Analista de Datos | Finanzas Cuantitativas 
 [LinkedIn](https://linkedin.com/in/krishnabustoss) · [GitHub](https://github.com/Iakrshn)
 

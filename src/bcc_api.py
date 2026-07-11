@@ -9,13 +9,15 @@ Documentación oficial: https://si3.bcentral.cl/Siete/ES/Siete/API
 Registro gratuito en: https://si3.bcentral.cl/Siete/ES/Siete/API
 """
 
+import logging
 import os
 import time
 import requests
 import pandas as pd
-import numpy as np
 from datetime import datetime
-from typing import Dict, List, Optional
+from requests.adapters import HTTPAdapter
+from typing import List, Optional
+from urllib3.util.retry import Retry
 
 
 # ── Catálogo de series más útiles para análisis de riesgo financiero ──────────
@@ -40,6 +42,50 @@ CATALOGO_SERIES = {
     # Tasas de mercado
     'tasa_captacion_90d' : 'F022.TAC.TAS.D090.NO.Z.M',
 }
+
+logger = logging.getLogger(__name__)
+
+
+def _resolve_codigo(nombre_o_codigo: str) -> str:
+    return CATALOGO_SERIES.get(nombre_o_codigo, nombre_o_codigo)
+
+
+def _nombre_a_columna(nombre_o_codigo: str) -> str:
+    if nombre_o_codigo in CATALOGO_SERIES:
+        return nombre_o_codigo
+    if '.' in nombre_o_codigo:
+        return nombre_o_codigo.replace('.', '_')
+    return nombre_o_codigo
+
+
+def _parse_series_obs(obs: list) -> pd.DataFrame:
+    df = pd.DataFrame(obs, columns=['fecha_str', 'valor', 'estado'])
+    df = df[df['estado'] == 'OK'].copy()
+    df['fecha'] = pd.to_datetime(df['fecha_str'], format='%d-%m-%Y')
+    df['valor'] = pd.to_numeric(df['valor'], errors='coerce')
+    return df[['fecha', 'valor']].dropna().reset_index(drop=True)
+
+
+def _build_retry_session() -> requests.Session:
+    session = requests.Session()
+    retries = Retry(
+        total=3,
+        backoff_factor=0.5,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=['GET'],
+    )
+    session.mount('https://', HTTPAdapter(max_retries=retries))
+    session.mount('http://', HTTPAdapter(max_retries=retries))
+    return session
+
+
+__all__ = [
+    'BancoCentralAPI',
+    'CATALOGO_SERIES',
+    'calcular_correlacion_rezago',
+    'calcular_hhi',
+    'estadisticas_por_ciclo',
+]
 
 
 class BancoCentralAPI:
@@ -67,6 +113,8 @@ class BancoCentralAPI:
                 '  BCC_PASS=tu_contraseña'
             )
 
+        self.session = _build_retry_session()
+
     def _request(self, codigo: str, fecha_ini: str, fecha_fin: str) -> dict:
         """Ejecuta la llamada a la API y retorna el JSON."""
         params = {
@@ -77,7 +125,7 @@ class BancoCentralAPI:
             'firstdate'  : fecha_ini,
             'lastdate'   : fecha_fin,
         }
-        resp = requests.get(self.BASE_URL, params=params, timeout=30)
+        resp = self.session.get(self.BASE_URL, params=params, timeout=30)
         resp.raise_for_status()
         data = resp.json()
         if data.get('Codigo') != 0:
@@ -109,16 +157,11 @@ class BancoCentralAPI:
             fecha_fin = datetime.today().strftime('%Y-%m-%d')
 
         # Resolver nombre → código BDE
-        codigo = CATALOGO_SERIES.get(nombre_o_codigo, nombre_o_codigo)
+        codigo = _resolve_codigo(nombre_o_codigo)
 
-        data   = self._request(codigo, fecha_ini, fecha_fin)
-        obs    = data['Series']['Obs']
-
-        df = pd.DataFrame(obs, columns=['fecha_str', 'valor', 'estado'])
-        df = df[df['estado'] == 'OK'].copy()
-        df['fecha'] = pd.to_datetime(df['fecha_str'], format='%d-%m-%Y')
-        df['valor'] = pd.to_numeric(df['valor'], errors='coerce')
-        df = df[['fecha', 'valor']].dropna().reset_index(drop=True)
+        data = self._request(codigo, fecha_ini, fecha_fin)
+        obs  = data['Series']['Obs']
+        df   = _parse_series_obs(obs)
 
         # Resamplear a frecuencia deseada
         freq_map = {'D': None, 'M': 'ME', 'Q': 'QE'}
@@ -152,15 +195,15 @@ class BancoCentralAPI:
         """
         dfs = {}
         for nombre in nombres:
-            col = nombre.split('.')[-1] if '.' in nombre else nombre
-            print(f'  Descargando {nombre}...', end=' ')
+            col = _nombre_a_columna(nombre)
+            logger.info('Descargando %s...', nombre)
             try:
                 df_s = self.get_serie(nombre, fecha_ini, fecha_fin)
                 df_s = df_s.rename(columns={'valor': col})
                 dfs[col] = df_s.set_index('fecha')
-                print(f'✓ ({len(df_s)} obs)')
-            except Exception as e:
-                print(f'✗ Error: {e}')
+                logger.info('Descargada %s (%d obs)', nombre, len(df_s))
+            except Exception:
+                logger.exception('Error descargando %s', nombre)
             time.sleep(pausa)
 
         if not dfs:
@@ -179,7 +222,8 @@ class BancoCentralAPI:
             'function'  : 'SearchSeries',
             'frequency' : frecuencia,
         }
-        resp = requests.get(self.BASE_URL, params=params, timeout=60)
+        resp = self.session.get(self.BASE_URL, params=params, timeout=60)
+        resp.raise_for_status()
         data = resp.json()
         return pd.DataFrame(data.get('SeriesInfos', []))
 
@@ -218,10 +262,15 @@ def calcular_correlacion_rezago(
         })
 
     df_res = pd.DataFrame(resultados)
+    if df_res.empty:
+        logger.warning('No hay suficientes datos para calcular correlación de rezago.')
+        return df_res
+
     idx_opt = df_res['pearson_r'].abs().idxmax()
-    print(f'Rezago óptimo: {df_res.loc[idx_opt, "lag"]} meses '
-          f'(r = {df_res.loc[idx_opt, "pearson_r"]:.4f}, '
-          f'p = {df_res.loc[idx_opt, "p_valor"]:.4f})')
+    logger.info('Rezago óptimo: %s meses (r = %.4f, p = %.4f)',
+                df_res.loc[idx_opt, 'lag'],
+                df_res.loc[idx_opt, 'pearson_r'],
+                df_res.loc[idx_opt, 'p_valor'])
     return df_res
 
 

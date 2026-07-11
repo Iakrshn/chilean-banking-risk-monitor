@@ -12,12 +12,36 @@ Uso:
 Los archivos se guardan en: data/raw/cmf_morosidad/
 """
 
+import logging
 import time
 import requests
 import re
 from pathlib import Path
 from datetime import datetime
 from urllib.parse import urljoin
+
+logger = logging.getLogger(__name__)
+
+
+def _infer_cmf_fecha(texto_completo: str) -> tuple[str, str] | None:
+    meses_map = {
+        'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
+        'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08',
+        'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12'
+    }
+
+    texto_completo = texto_completo.lower()
+    for nombre_mes, num_mes in meses_map.items():
+        if nombre_mes in texto_completo:
+            match_anio = re.search(r'20\d{2}', texto_completo)
+            if match_anio:
+                return match_anio.group(0), num_mes
+
+    match_simple = re.search(r'(20\d{2})[/-](\d{2})', texto_completo)
+    if match_simple:
+        return match_simple.group(1), match_simple.group(2)
+
+    return None
 
 
 # ── Dependencias opcionales (para parsear HTML) ───────────────────────────────
@@ -65,9 +89,8 @@ def obtener_links_cmf(url: str) -> list[dict]:
             contexto = a.find_parent('tr') or padre 
             texto_completo = (contexto.get_text() if contexto else texto).lower()
 
-            anio, mes = 'XXXX', 'XX'
-            
-            # Intentar buscar "Mes Año"
+            anio, mes = None, None
+
             for nombre_mes, num_mes in meses_map.items():
                 if nombre_mes in texto_completo:
                     match_anio = re.search(r'20\d{2}', texto_completo)
@@ -76,17 +99,17 @@ def obtener_links_cmf(url: str) -> list[dict]:
                         mes = num_mes
                         break
 
-            # Respaldo YYYY-MM
-            if anio == 'XXXX':
-                match_simple = re.search(r'(\d{4})[/-](\d{2})', texto_completo)
+            if not anio:
+                match_simple = re.search(r'(20\d{2})[/-](\d{2})', texto_completo)
                 if match_simple:
                     anio = match_simple.group(1)
                     mes = match_simple.group(2)
 
-            # --- ESTA ES LA PARTE QUE FALTABA ---
-            # Unimos la URL usando URL_CMF para evitar el error 404
-            url_completa = urljoin(URL_CMF, href)
-            
+            if not anio or not mes:
+                logger.warning('No se pudo inferir fecha para el link CMF: %s', texto_completo)
+                continue
+
+            url_completa = urljoin(BASE_URL, href)
             links.append({
                 'nombre' : f'{anio}-{mes}',
                 'url'    : url_completa,

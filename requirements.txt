@@ -25,3 +25,7 @@ plotly>=5.17.0            # dashboard interactivo
 # Notebooks
 jupyter>=1.0.0
 ipykernel>=6.0.0
+
+# Tests
+pytest>=9.0.0
+requests-mock>=1.0.0

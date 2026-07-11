@@ -3,5 +3,11 @@ data/
 *.xlsx
 *.csv
 
+# Entorno virtual
+.venv/
+
 # Ignorar credenciales
 .env
+
+# Archivos temporales de notebooks
+notebooks/newplot.png
